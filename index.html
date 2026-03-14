@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Cubbon Designs Navigator</title>
+<script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+<style>
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body {
+  height: 100%;
+  overflow: hidden;
+  touch-action: manipulation;
+}
+
+body {
+  background: #111;
+  color: #fff;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* ── Welcome Screen ── */
+#welcome-screen {
+  position: fixed;
+  inset: 0;
+  background: #111;
+  z-index: 300;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 28px;
+  text-align: center;
+}
+
+#welcome-screen.hidden {
+  display: none;
+}
+
+#welcome-screen h1 {
+  font-size: 28px;
+  font-weight: 300;
+  letter-spacing: 1.5px;
+  margin-bottom: 18px;
+  color: #fff;
+}
+
+#welcome-screen p {
+  font-size: 15px;
+  color: #888;
+  line-height: 1.6;
+  max-width: 320px;
+  margin-bottom: 40px;
+}
+
+#welcome-start-btn {
+  background: #ff3b3b;
+  color: #fff;
+  border: none;
+  padding: 16px 40px;
+  border-radius: 30px;
+  font-size: 15px;
+  cursor: pointer;
+  letter-spacing: 0.5px;
+  transition: background 0.2s;
+}
+
+#welcome-start-btn:active {
+  background: #e02020;
+}
+
+/* ── Top Navigation Bar ── */
+#top-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  z-index: 50;
+  background: #111;
+}
+
+#nav-title {
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.5px;
+  color: #ccc;
+  cursor: default;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+#admin-btn {
+  background: transparent;
+  color: #555;
+  border: 1px solid #333;
+  padding: 7px 14px;
+  border-radius: 14px;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, opacity 0.3s;
+  opacity: 0;
+  pointer-events: none;
+}
+
+#admin-btn.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+#admin-btn:active {
+  border-color: #666;
+  color: #999;
+}
+
+/* ── Distance Display ── */
+#distance-section {
+  margin-top: 58px;
+  text-align: center;
+}
+
+#distance-section .label {
+  font-size: 11px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 2.5px;
+}
+
+#distance-value {
+  font-size: 52px;
+  font-weight: 200;
+  margin-top: 6px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+  min-height: 56px;
+}
+
+/* ── Calibration Notice ── */
+#calibration-notice {
+  display: none;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #ff3b3b;
+  letter-spacing: 0.5px;
+  text-align: center;
+  animation: pulse-text 1.2s ease-in-out infinite;
+}
+
+#calibration-notice.show {
+  display: block;
+}
+
+@keyframes pulse-text {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+
+/* ── Radar ── */
+#radar-wrap {
+  position: relative;
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#radar-container {
+  position: relative;
+}
+
+#radar-canvas {
+  display: block;
+}
+
+/* ── Target Dot (DOM element, lerped via JS) ── */
+#target-dot {
+  display: none;
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #ff3b3b;
+  box-shadow: 0 0 12px 3px rgba(255, 59, 59, 0.4),
+              0 0 24px 6px rgba(255, 59, 59, 0.15);
+  pointer-events: none;
+  z-index: 10;
+  transform: translate(-50%, -50%);
+}
+
+#target-dot.show {
+  display: block;
+}
+
+/* Pulse ring on the dot */
+#target-dot::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 59, 59, 0.35);
+  transform: translate(-50%, -50%);
+  animation: dot-pulse 1.8s ease-out infinite;
+}
+
+@keyframes dot-pulse {
+  0% { width: 16px; height: 16px; opacity: 0.6; }
+  100% { width: 36px; height: 36px; opacity: 0; }
+}
+
+/* ── Controls ── */
+#controls {
+  margin-top: 32px;
+  display: flex;
+  gap: 14px;
+}
+
+.btn {
+  background: transparent;
+  color: #ccc;
+  border: 1px solid #444;
+  padding: 13px 30px;
+  border-radius: 26px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  letter-spacing: 0.3px;
+}
+
+.btn:active {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.btn.running {
+  border-color: #ff3b3b;
+  color: #ff3b3b;
+}
+
+/* ── Status ── */
+#status {
+  position: fixed;
+  bottom: 20px;
+  font-size: 10px;
+  color: #333;
+  letter-spacing: 0.5px;
+  text-align: center;
+  padding: 0 20px;
+}
+
+/* ── Admin Panel ── */
+#admin-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.94);
+  z-index: 200;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 28px;
+}
+
+#admin-overlay.open {
+  display: flex;
+}
+
+#admin-overlay h2 {
+  font-size: 18px;
+  font-weight: 300;
+  margin-bottom: 28px;
+  color: #aaa;
+  letter-spacing: 1px;
+}
+
+.field {
+  width: 100%;
+  max-width: 300px;
+  margin-bottom: 18px;
+}
+
+.field label {
+  display: block;
+  font-size: 10px;
+  color: #666;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  margin-bottom: 5px;
+}
+
+.field input[type="number"] {
+  width: 100%;
+  background: #1a1a1a;
+  border: 1px solid #333;
+  color: #fff;
+  padding: 11px 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.field input[type="number"]:focus {
+  border-color: #555;
+}
+
+.field input[type="range"] {
+  width: 100%;
+  accent-color: #ff3b3b;
+  margin-top: 2px;
+}
+
+.field .rv {
+  font-size: 12px;
+  color: #777;
+  margin-top: 3px;
+  text-align: right;
+}
+
+#admin-btns {
+  display: flex;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+/* ── Bottom Sheet Modal ── */
+#bottom-sheet-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 250;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+#bottom-sheet-overlay.open {
+  display: flex;
+}
+
+#bottom-sheet {
+  background: #1a1a1a;
+  width: 100%;
+  max-width: 480px;
+  border-radius: 20px 20px 0 0;
+  padding: 28px 24px 36px;
+  text-align: center;
+}
+
+#bottom-sheet .sheet-text {
+  font-size: 17px;
+  font-weight: 400;
+  color: #ddd;
+  margin-bottom: 24px;
+  line-height: 1.5;
+}
+
+#bottom-sheet .sheet-btns {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+#bottom-sheet .sheet-btn {
+  padding: 14px 20px;
+  border-radius: 14px;
+  font-size: 15px;
+  cursor: pointer;
+  border: none;
+  letter-spacing: 0.3px;
+}
+
+#bottom-sheet .sheet-btn.primary {
+  background: #ff3b3b;
+  color: #fff;
+}
+
+#bottom-sheet .sheet-btn.primary:active {
+  background: #e02020;
+}
+
+#bottom-sheet .sheet-btn.secondary {
+  background: transparent;
+  color: #aaa;
+  border: 1px solid #333;
+}
+
+#bottom-sheet .sheet-btn.secondary:active {
+  background: rgba(255,255,255,0.04);
+}
+
+/* ── Success Screen ── */
+#success-screen {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: #111;
+  z-index: 260;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 28px;
+}
+
+#success-screen.open {
+  display: flex;
+}
+
+#success-screen h1 {
+  font-size: 26px;
+  font-weight: 300;
+  color: #fff;
+  letter-spacing: 1px;
+  margin-bottom: 16px;
+}
+
+#success-screen .success-sub {
+  font-size: 14px;
+  color: #666;
+}
+
+/* ── Confetti Canvas ── */
+#confetti-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 261;
+  pointer-events: none;
+}
+
+/* ── Manual Arrival Button ── */
+#arrival-btn {
+  background: transparent;
+  color: #ff9500;
+  border: 1px solid #ff9500;
+  padding: 13px 30px;
+  border-radius: 26px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+  letter-spacing: 0.3px;
+  margin-top: 14px;
+}
+
+#arrival-btn:active {
+  background: rgba(255,149,0,0.1);
+}
+</style>
+</head>
+<body>
+
+<!-- Welcome Screen -->
+<div id="welcome-screen">
+  <h1>Welcome to Cubbon Designs</h1>
+  <p>Here's your navigator to guide you through the event. Find the orange carpet to attend Cubbon Designs.</p>
+  <button id="welcome-start-btn">Let's get started</button>
+</div>
+
+<!-- Top Navigation Bar -->
+<div id="top-nav">
+  <span id="nav-title">Cubbon Designs</span>
+  <button id="admin-btn">Admin</button>
+</div>
+
+<div id="distance-section">
+  <div class="label">Distance to Target</div>
+  <div id="distance-value">---</div>
+</div>
+
+<div id="calibration-notice">Calibrating compass…</div>
+
+<div id="radar-wrap">
+  <div id="radar-container">
+    <canvas id="radar-canvas"></canvas>
+    <div id="target-dot"></div>
+  </div>
+</div>
+
+<div id="controls">
+  <button class="btn" id="start-btn">Start Navigation</button>
+  <button class="btn" id="recalibrate-btn">Recalibrate</button>
+</div>
+
+<button id="arrival-btn">I see the orange carpet</button>
+
+<div id="status">Waiting to start</div>
+
+<!-- Bottom Sheet Modal -->
+<div id="bottom-sheet-overlay">
+  <div id="bottom-sheet">
+    <div class="sheet-text" id="sheet-text"></div>
+    <div class="sheet-btns" id="sheet-btns"></div>
+  </div>
+</div>
+
+<!-- Success Screen -->
+<div id="success-screen">
+  <h1>You've arrived at Cubbon Designs</h1>
+  <div class="success-sub">Enjoy the event!</div>
+</div>
+<canvas id="confetti-canvas"></canvas>
+
+<!-- Admin Panel -->
+<div id="admin-overlay">
+  <h2>Configuration</h2>
+  <div class="field">
+    <label>Target Latitude</label>
+    <input type="number" id="inp-lat" step="0.000001" placeholder="12.9763">
+  </div>
+  <div class="field">
+    <label>Target Longitude</label>
+    <input type="number" id="inp-lng" step="0.000001" placeholder="77.5929">
+  </div>
+  <div class="field">
+    <label>Smoothing Factor (α)</label>
+    <input type="range" id="inp-smooth" min="0.02" max="0.5" step="0.01" value="0.1">
+    <div class="rv" id="rv-smooth">0.10</div>
+  </div>
+  <div class="field">
+    <label>Outlier Threshold (±degrees)</label>
+    <input type="range" id="inp-outlier" min="10" max="120" step="1" value="45">
+    <div class="rv" id="rv-outlier">±45°</div>
+  </div>
+  <div id="admin-btns">
+    <button class="btn" id="btn-save">Save</button>
+    <button class="btn" id="btn-close">Close</button>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ══════════════════════════════════════
+     STATE
+     ══════════════════════════════════════ */
+  var S = {
+    active: false,
+
+    // GPS
+    userLat: null,
+    userLng: null,
+    watchId: null,
+
+    // Compass
+    rawHeading: null,
+    previousHeading: null,
+    smoothedHeading: 0,
+    hasCompass: false,
+
+    // Calibration warm-up
+    calibrating: false,
+    calibrationTimer: null,
+
+    // Target (Cubbon Designs event location)
+    targetLat: 12.9763,
+    targetLng: 77.5929,
+
+    // Settings
+    smoothingFactor: 0.1,
+    outlierThreshold: 45,
+    lerpSpeed: 0.08,
+
+    // Computed
+    targetBearing: 0,
+    relativeAngle: 0,
+    distance: null,
+
+    // Dot lerp position (pixel coords within radar-container)
+    currentDotX: 0,
+    currentDotY: 0,
+    targetDotX: 0,
+    targetDotY: 0,
+
+    // Radar sweep
+    sweep: 0
+  };
+
+  /* ══════════════════════════════════════
+     SETTINGS PERSISTENCE
+     ══════════════════════════════════════ */
+  function loadSettings() {
+    try {
+      var d = JSON.parse(localStorage.getItem('rnav3'));
+      if (d) {
+        if (d.lat != null) S.targetLat = d.lat;
+        if (d.lng != null) S.targetLng = d.lng;
+        if (d.sf != null) S.smoothingFactor = d.sf;
+        if (d.ot != null) S.outlierThreshold = d.ot;
+      }
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    localStorage.setItem('rnav3', JSON.stringify({
+      lat: S.targetLat,
+      lng: S.targetLng,
+      sf: S.smoothingFactor,
+      ot: S.outlierThreshold
+    }));
+  }
+
+  /* ══════════════════════════════════════
+     DOM REFS
+     ══════════════════════════════════════ */
+  var canvas     = document.getElementById('radar-canvas');
+  var ctx        = canvas.getContext('2d');
+  var distEl     = document.getElementById('distance-value');
+  var startBtn   = document.getElementById('start-btn');
+  var recalBtn   = document.getElementById('recalibrate-btn');
+  var statusEl   = document.getElementById('status');
+  var calNotice  = document.getElementById('calibration-notice');
+  var dotEl      = document.getElementById('target-dot');
+  var radarCont  = document.getElementById('radar-container');
+
+  // Admin
+  var adminBtn   = document.getElementById('admin-btn');
+  var overlay    = document.getElementById('admin-overlay');
+  var btnSave    = document.getElementById('btn-save');
+  var btnClose   = document.getElementById('btn-close');
+  var inpLat     = document.getElementById('inp-lat');
+  var inpLng     = document.getElementById('inp-lng');
+  var inpSmooth  = document.getElementById('inp-smooth');
+  var rvSmooth   = document.getElementById('rv-smooth');
+  var inpOutlier = document.getElementById('inp-outlier');
+  var rvOutlier  = document.getElementById('rv-outlier');
+
+  // Welcome
+  var welcomeScreen = document.getElementById('welcome-screen');
+  var welcomeBtn    = document.getElementById('welcome-start-btn');
+
+  // Top nav
+  var navTitle   = document.getElementById('nav-title');
+
+  // Arrival
+  var arrivalBtn       = document.getElementById('arrival-btn');
+  var bottomOverlay    = document.getElementById('bottom-sheet-overlay');
+  var sheetText        = document.getElementById('sheet-text');
+  var sheetBtns        = document.getElementById('sheet-btns');
+  var successScreen    = document.getElementById('success-screen');
+  var confettiCanvas   = document.getElementById('confetti-canvas');
+  var confettiCtx      = confettiCanvas.getContext('2d');
+
+  // State for new features
+  var titleTapCount = 0;
+  var titleTapTimer = null;
+  var autoRecalTimer = null;
+  var arrivalPromptShown = false;
+  var hasArrived = false;
+
+  /* ══════════════════════════════════════
+     CANVAS SIZING
+     ══════════════════════════════════════ */
+  var RAD, CX, CY, canvasSize;
+
+  function sizeCanvas() {
+    var maxW = window.innerWidth - 40;
+    var maxH = window.innerHeight - 320;
+    var sz = Math.max(220, Math.min(maxW, maxH, 420));
+    canvasSize = sz;
+    var dpr = window.devicePixelRatio || 1;
+
+    canvas.width = sz * dpr;
+    canvas.height = sz * dpr;
+    canvas.style.width = sz + 'px';
+    canvas.style.height = sz + 'px';
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    radarCont.style.width = sz + 'px';
+    radarCont.style.height = sz + 'px';
+
+    RAD = (sz / 2) - 22;
+    CX = sz / 2;
+    CY = sz / 2;
+
+    // Reset dot to center
+    S.currentDotX = CX;
+    S.currentDotY = CY;
+    S.targetDotX = CX;
+    S.targetDotY = CY;
+  }
+
+  /* ══════════════════════════════════════
+     DRAW RADAR (canvas — static elements + sweep)
+     ══════════════════════════════════════ */
+  function drawRadar() {
+    ctx.clearRect(0, 0, canvasSize, canvasSize);
+
+    // ── Concentric rings ──
+    for (var i = 1; i <= 4; i++) {
+      ctx.beginPath();
+      ctx.arc(CX, CY, (RAD / 4) * i, 0, Math.PI * 2);
+      if (i === 4) {
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1.5;
+      } else {
+        ctx.strokeStyle = '#222';
+        ctx.lineWidth = 0.5;
+      }
+      ctx.stroke();
+    }
+
+    // ── Crosshairs ──
+    ctx.strokeStyle = '#1e1e1e';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath();
+    ctx.moveTo(CX, CY - RAD);
+    ctx.lineTo(CX, CY + RAD);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(CX - RAD, CY);
+    ctx.lineTo(CX + RAD, CY);
+    ctx.stroke();
+
+    // ── Diagonal crosshairs ──
+    var d45 = RAD * 0.707;
+    ctx.strokeStyle = '#191919';
+    ctx.beginPath();
+    ctx.moveTo(CX - d45, CY - d45);
+    ctx.lineTo(CX + d45, CY + d45);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(CX + d45, CY - d45);
+    ctx.lineTo(CX - d45, CY + d45);
+    ctx.stroke();
+
+    // ── Sweep line ──
+    if (S.active) {
+      ctx.save();
+      ctx.translate(CX, CY);
+      ctx.rotate(S.sweep);
+
+      var sg = ctx.createLinearGradient(0, 0, RAD, 0);
+      sg.addColorStop(0, 'rgba(255,59,59,0.18)');
+      sg.addColorStop(1, 'rgba(255,59,59,0)');
+      ctx.strokeStyle = sg;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(RAD, 0);
+      ctx.stroke();
+
+      // Sweep trail
+      for (var t = 1; t <= 8; t++) {
+        ctx.rotate(-0.04);
+        var a = 0.13 - t * 0.015;
+        if (a <= 0) break;
+        var tg = ctx.createLinearGradient(0, 0, RAD, 0);
+        tg.addColorStop(0, 'rgba(255,59,59,' + a + ')');
+        tg.addColorStop(1, 'rgba(255,59,59,0)');
+        ctx.strokeStyle = tg;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.lineTo(RAD, 0);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
+
+    // ── Center user marker ──
+    ctx.beginPath();
+    ctx.arc(CX, CY, 4, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+
+    ctx.beginPath();
+    ctx.arc(CX, CY, 8, 0, Math.PI * 2);
+    ctx.strokeStyle = 'rgba(255,255,255,0.2)';
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // ── Forward indicator triangle ──
+    ctx.beginPath();
+    ctx.moveTo(CX, CY - RAD - 13);
+    ctx.lineTo(CX - 5, CY - RAD - 5);
+    ctx.lineTo(CX + 5, CY - RAD - 5);
+    ctx.closePath();
+    ctx.fillStyle = '#444';
+    ctx.fill();
+  }
+
+  /* ══════════════════════════════════════
+     WRAPAROUND-SAFE ANGLE HELPERS
+     ══════════════════════════════════════ */
+
+  // Returns value in -180..180
+  function wrapDelta(a, b) {
+    return ((a - b + 540) % 360) - 180;
+  }
+
+  /* ══════════════════════════════════════
+     COMPASS HEADING PROCESSING
+     ══════════════════════════════════════ */
+  function processHeading(rawDeg) {
+    // Normalize 0-360
+    rawDeg = (rawDeg + 360) % 360;
+
+    // ── Fix 1: Outlier rejection (wraparound-safe) ──
+    if (S.previousHeading !== null) {
+      var delta = wrapDelta(rawDeg, S.previousHeading);
+      if (Math.abs(delta) > S.outlierThreshold) {
+        // Reject this reading
+        return;
+      }
+    }
+    S.previousHeading = rawDeg;
+
+    // ── Fix 2: Low-pass filter ──
+    // Must handle wraparound for smoothing too
+    var smoothDelta = wrapDelta(rawDeg, S.smoothedHeading);
+    S.smoothedHeading = (S.smoothedHeading + S.smoothingFactor * smoothDelta + 360) % 360;
+  }
+
+  /* ══════════════════════════════════════
+     NAVIGATION UPDATE
+     ══════════════════════════════════════ */
+  function updateNavigation() {
+    if (!S.active || S.userLat === null || S.calibrating) return;
+
+    var userPt = turf.point([S.userLng, S.userLat]);
+    var targetPt = turf.point([S.targetLng, S.targetLat]);
+
+    // Distance
+    var dKm = turf.distance(userPt, targetPt);
+    S.distance = dKm;
+    var dMeters = dKm * 1000;
+
+    if (dMeters < 1000) {
+      distEl.textContent = Math.round(dMeters) + ' m';
+    } else {
+      distEl.textContent = dKm.toFixed(2) + ' km';
+    }
+
+    // Target bearing (0-360)
+    var tBear = turf.bearing(userPt, targetPt);
+    tBear = (tBear + 360) % 360;
+    S.targetBearing = tBear;
+
+    // Relative angle (wraparound-safe), -180 to +180
+    S.relativeAngle = wrapDelta(tBear, S.smoothedHeading);
+
+    // Compute target dot pixel position on perimeter
+    var angleRad = S.relativeAngle * (Math.PI / 180);
+    S.targetDotX = CX + RAD * Math.sin(angleRad);
+    S.targetDotY = CY - RAD * Math.cos(angleRad);
+  }
+
+  /* ══════════════════════════════════════
+     DOT LERP — Fix 3: Smooth the dot position
+     ══════════════════════════════════════ */
+  function lerpDot() {
+    S.currentDotX += S.lerpSpeed * (S.targetDotX - S.currentDotX);
+    S.currentDotY += S.lerpSpeed * (S.targetDotY - S.currentDotY);
+
+    dotEl.style.left = S.currentDotX + 'px';
+    dotEl.style.top = S.currentDotY + 'px';
+  }
+
+  /* ══════════════════════════════════════
+     GEOLOCATION
+     ══════════════════════════════════════ */
+  function startGeo() {
+    if (!navigator.geolocation) {
+      statusEl.textContent = 'Geolocation not supported';
+      return;
+    }
+    S.watchId = navigator.geolocation.watchPosition(
+      function (pos) {
+        S.userLat = pos.coords.latitude;
+        S.userLng = pos.coords.longitude;
+        var acc = Math.round(pos.coords.accuracy);
+        if (!S.calibrating) {
+          statusEl.textContent = 'GPS ±' + acc + 'm' + (S.hasCompass ? ' · compass active' : '');
+        }
+      },
+      function (err) {
+        statusEl.textContent = 'GPS error: ' + err.message;
+      },
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    );
+  }
+
+  function stopGeo() {
+    if (S.watchId !== null) {
+      navigator.geolocation.clearWatch(S.watchId);
+      S.watchId = null;
+    }
+  }
+
+  /* ══════════════════════════════════════
+     DEVICE ORIENTATION (COMPASS)
+     ══════════════════════════════════════ */
+  function onDeviceOrientation(e) {
+    var heading = null;
+
+    // iOS: webkitCompassHeading gives true-north heading directly
+    if (e.webkitCompassHeading !== undefined && e.webkitCompassHeading !== null) {
+      heading = e.webkitCompassHeading;
+    }
+    // Android / others: alpha is rotation around z-axis
+    // compass heading = (360 - alpha) % 360
+    else if (e.alpha !== null && e.alpha !== undefined) {
+      heading = (360 - e.alpha) % 360;
+    }
+
+    if (heading === null) return;
+
+    S.hasCompass = true;
+    S.rawHeading = heading;
+
+    // Process through outlier rejection + low-pass filter
+    processHeading(heading);
+  }
+
+  function startCompass() {
+    // iOS permission gate
+    if (typeof DeviceOrientationEvent !== 'undefined' &&
+        typeof DeviceOrientationEvent.requestPermission === 'function') {
+      DeviceOrientationEvent.requestPermission()
+        .then(function (state) {
+          if (state === 'granted') {
+            window.addEventListener('deviceorientation', onDeviceOrientation, true);
+            window.addEventListener('deviceorientationabsolute', onDeviceOrientation, true);
+          } else {
+            statusEl.textContent = 'Compass permission denied';
+          }
+        })
+        .catch(function () {
+          statusEl.textContent = 'Compass permission error';
+        });
+    } else {
+      // Android / desktop: prefer absolute orientation
+      window.addEventListener('deviceorientationabsolute', onDeviceOrientation, true);
+      window.addEventListener('deviceorientation', onDeviceOrientation, true);
+    }
+  }
+
+  function stopCompass() {
+    window.removeEventListener('deviceorientation', onDeviceOrientation, true);
+    window.removeEventListener('deviceorientationabsolute', onDeviceOrientation, true);
+    S.hasCompass = false;
+  }
+
+  /* ══════════════════════════════════════
+     CALIBRATION WARM-UP — Fix 4
+     ══════════════════════════════════════ */
+  function beginCalibration() {
+    S.calibrating = true;
+    S.previousHeading = null;
+    calNotice.classList.add('show');
+    statusEl.textContent = 'Calibrating…';
+
+    // Reset dot to center
+    S.currentDotX = CX;
+    S.currentDotY = CY;
+    S.targetDotX = CX;
+    S.targetDotY = CY;
+
+    if (S.calibrationTimer) clearTimeout(S.calibrationTimer);
+
+    S.calibrationTimer = setTimeout(function () {
+      S.calibrating = false;
+      calNotice.classList.remove('show');
+      // Snap smoothedHeading to current raw heading for clean start
+      if (S.rawHeading !== null) {
+        S.smoothedHeading = S.rawHeading;
+        S.previousHeading = S.rawHeading;
+      }
+      statusEl.textContent = 'Navigation active';
+    }, 3000);
+  }
+
+  /* ══════════════════════════════════════
+     ANIMATION LOOP
+     ══════════════════════════════════════ */
+  function tick() {
+    // Update navigation computations
+    updateNavigation();
+
+    // Check arrival proximity
+    if (S.active && !S.calibrating) {
+      checkArrivalProximity();
+    }
+
+    // Lerp the dot toward computed position
+    if (S.active && S.userLat !== null && !S.calibrating) {
+      lerpDot();
+    }
+
+    // Advance sweep
+    if (S.active) {
+      S.sweep += 0.018;
+      if (S.sweep > Math.PI * 2) S.sweep -= Math.PI * 2;
+    }
+
+    // Draw radar
+    drawRadar();
+
+    requestAnimationFrame(tick);
+  }
+
+  /* ══════════════════════════════════════
+     CONTROLS
+     ══════════════════════════════════════ */
+  startBtn.addEventListener('click', function () {
+    if (!S.active) {
+      S.active = true;
+      S.smoothedHeading = 0;
+      S.previousHeading = null;
+      S.rawHeading = null;
+      arrivalPromptShown = false;
+      startBtn.textContent = 'Stop Navigation';
+      startBtn.classList.add('running');
+      dotEl.classList.add('show');
+      startGeo();
+      startCompass();
+      beginCalibration();
+      startAutoRecal();
+    } else {
+      S.active = false;
+      S.calibrating = false;
+      if (S.calibrationTimer) clearTimeout(S.calibrationTimer);
+      calNotice.classList.remove('show');
+      startBtn.textContent = 'Start Navigation';
+      startBtn.classList.remove('running');
+      dotEl.classList.remove('show');
+      stopGeo();
+      stopCompass();
+      stopAutoRecal();
+      distEl.textContent = '---';
+      S.userLat = S.userLng = null;
+      S.distance = null;
+      statusEl.textContent = 'Navigation stopped';
+    }
+  });
+
+  recalBtn.addEventListener('click', function () {
+    if (!S.active) return;
+
+    // Reset smoothedHeading to current raw heading
+    if (S.rawHeading !== null) {
+      S.smoothedHeading = S.rawHeading;
+      S.previousHeading = S.rawHeading;
+    }
+
+    // Reset dot to center
+    S.currentDotX = CX;
+    S.currentDotY = CY;
+    S.targetDotX = CX;
+    S.targetDotY = CY;
+
+    // Restart warm-up
+    beginCalibration();
+  });
+
+  /* ══════════════════════════════════════
+     ADMIN PANEL
+     ══════════════════════════════════════ */
+  adminBtn.addEventListener('click', function () {
+    inpLat.value = S.targetLat;
+    inpLng.value = S.targetLng;
+    inpSmooth.value = S.smoothingFactor;
+    rvSmooth.textContent = S.smoothingFactor.toFixed(2);
+    inpOutlier.value = S.outlierThreshold;
+    rvOutlier.textContent = '±' + S.outlierThreshold + '°';
+    overlay.classList.add('open');
+  });
+
+  btnClose.addEventListener('click', function () {
+    overlay.classList.remove('open');
+  });
+
+  inpSmooth.addEventListener('input', function () {
+    rvSmooth.textContent = parseFloat(this.value).toFixed(2);
+  });
+
+  inpOutlier.addEventListener('input', function () {
+    rvOutlier.textContent = '±' + this.value + '°';
+  });
+
+  btnSave.addEventListener('click', function () {
+    var la = parseFloat(inpLat.value);
+    var ln = parseFloat(inpLng.value);
+    if (!isNaN(la) && !isNaN(ln)) {
+      S.targetLat = la;
+      S.targetLng = ln;
+    }
+    S.smoothingFactor = parseFloat(inpSmooth.value);
+    S.outlierThreshold = parseInt(inpOutlier.value, 10);
+    saveSettings();
+    overlay.classList.remove('open');
+    statusEl.textContent = 'Settings saved';
+    setTimeout(function () {
+      if (S.active) statusEl.textContent = 'Navigation active';
+    }, 1500);
+  });
+
+  /* ══════════════════════════════════════
+     WELCOME SCREEN
+     ══════════════════════════════════════ */
+  welcomeBtn.addEventListener('click', function () {
+    welcomeScreen.classList.add('hidden');
+  });
+
+  /* ══════════════════════════════════════
+     TRIPLE-TAP ADMIN REVEAL
+     ══════════════════════════════════════ */
+  navTitle.addEventListener('click', function () {
+    titleTapCount++;
+    if (titleTapTimer) clearTimeout(titleTapTimer);
+    if (titleTapCount >= 3) {
+      titleTapCount = 0;
+      adminBtn.classList.toggle('visible');
+      return;
+    }
+    titleTapTimer = setTimeout(function () {
+      titleTapCount = 0;
+    }, 600);
+  });
+
+  /* ══════════════════════════════════════
+     AUTO RECALIBRATION (every 30s)
+     ══════════════════════════════════════ */
+  function startAutoRecal() {
+    stopAutoRecal();
+    autoRecalTimer = setInterval(function () {
+      if (S.active && !S.calibrating) {
+        beginCalibration();
+      }
+    }, 30000);
+  }
+
+  function stopAutoRecal() {
+    if (autoRecalTimer) {
+      clearInterval(autoRecalTimer);
+      autoRecalTimer = null;
+    }
+  }
+
+  /* ══════════════════════════════════════
+     ARRIVAL DETECTION & FLOW
+     ══════════════════════════════════════ */
+  function checkArrivalProximity() {
+    if (hasArrived || arrivalPromptShown) return;
+    if (S.distance === null) return;
+    var dMeters = S.distance * 1000;
+    if (dMeters >= 30 && dMeters <= 40) {
+      arrivalPromptShown = true;
+      showArrivalQuestion();
+    }
+  }
+
+  function showArrivalQuestion() {
+    sheetText.textContent = 'Did you spot the orange carpet?';
+    sheetBtns.innerHTML = '';
+
+    var yesBtn = document.createElement('button');
+    yesBtn.className = 'sheet-btn primary';
+    yesBtn.textContent = 'Yes, I see it';
+    yesBtn.addEventListener('click', function () {
+      bottomOverlay.classList.remove('open');
+      showSuccessScreen();
+    });
+
+    var noBtn = document.createElement('button');
+    noBtn.className = 'sheet-btn secondary';
+    noBtn.textContent = "No, I can't find it";
+    noBtn.addEventListener('click', function () {
+      sheetText.textContent = 'Please contact the event organizers via the Cubbon Designs WhatsApp group.';
+      sheetBtns.innerHTML = '';
+      var okBtn = document.createElement('button');
+      okBtn.className = 'sheet-btn secondary';
+      okBtn.textContent = 'OK';
+      okBtn.addEventListener('click', function () {
+        bottomOverlay.classList.remove('open');
+        arrivalPromptShown = false;
+      });
+      sheetBtns.appendChild(okBtn);
+    });
+
+    sheetBtns.appendChild(yesBtn);
+    sheetBtns.appendChild(noBtn);
+    bottomOverlay.classList.add('open');
+  }
+
+  function showSuccessScreen() {
+    hasArrived = true;
+
+    // Stop navigation
+    if (S.active) {
+      S.active = false;
+      S.calibrating = false;
+      if (S.calibrationTimer) clearTimeout(S.calibrationTimer);
+      calNotice.classList.remove('show');
+      startBtn.textContent = 'Start Navigation';
+      startBtn.classList.remove('running');
+      dotEl.classList.remove('show');
+      stopGeo();
+      stopCompass();
+      stopAutoRecal();
+      distEl.textContent = '---';
+      S.userLat = S.userLng = null;
+      S.distance = null;
+    }
+
+    successScreen.classList.add('open');
+    startConfetti();
+  }
+
+  /* ══════════════════════════════════════
+     CONFETTI ANIMATION
+     ══════════════════════════════════════ */
+  var confettiPieces = [];
+  var confettiRunning = false;
+
+  function startConfetti() {
+    confettiCanvas.width = window.innerWidth;
+    confettiCanvas.height = window.innerHeight;
+    confettiCanvas.style.width = window.innerWidth + 'px';
+    confettiCanvas.style.height = window.innerHeight + 'px';
+    confettiPieces = [];
+    var colors = ['#ff3b3b', '#ff9500', '#ffcc00', '#34c759', '#007aff', '#af52de', '#ff2d55'];
+    for (var i = 0; i < 150; i++) {
+      confettiPieces.push({
+        x: Math.random() * confettiCanvas.width,
+        y: Math.random() * confettiCanvas.height - confettiCanvas.height,
+        w: Math.random() * 8 + 4,
+        h: Math.random() * 6 + 3,
+        color: colors[Math.floor(Math.random() * colors.length)],
+        vx: (Math.random() - 0.5) * 3,
+        vy: Math.random() * 3 + 2,
+        rot: Math.random() * 360,
+        rv: (Math.random() - 0.5) * 8
+      });
+    }
+    confettiRunning = true;
+    tickConfetti();
+  }
+
+  function tickConfetti() {
+    if (!confettiRunning) return;
+    confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    var allDone = true;
+    for (var i = 0; i < confettiPieces.length; i++) {
+      var p = confettiPieces[i];
+      p.x += p.vx;
+      p.y += p.vy;
+      p.vy += 0.05;
+      p.rot += p.rv;
+      if (p.y < confettiCanvas.height + 20) allDone = false;
+      confettiCtx.save();
+      confettiCtx.translate(p.x, p.y);
+      confettiCtx.rotate(p.rot * Math.PI / 180);
+      confettiCtx.fillStyle = p.color;
+      confettiCtx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+      confettiCtx.restore();
+    }
+    if (allDone) {
+      confettiRunning = false;
+      confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    } else {
+      requestAnimationFrame(tickConfetti);
+    }
+  }
+
+  /* ══════════════════════════════════════
+     MANUAL ARRIVAL BUTTON
+     ══════════════════════════════════════ */
+  arrivalBtn.addEventListener('click', function () {
+    if (hasArrived) return;
+    showArrivalQuestion();
+  });
+
+  /* ══════════════════════════════════════
+     INIT
+     ══════════════════════════════════════ */
+  loadSettings();
+  sizeCanvas();
+  window.addEventListener('resize', function () {
+    sizeCanvas();
+  });
+  tick();
+})();
+</script>
+</body>
+</html>
