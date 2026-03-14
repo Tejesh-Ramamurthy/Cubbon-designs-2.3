@@ -448,6 +448,7 @@ body {
 
 /* ── Manual Arrival Button ── */
 #arrival-btn {
+  display: none;
   background: transparent;
   color: #ff9500;
   border: 1px solid #ff9500;
@@ -458,6 +459,10 @@ body {
   transition: background 0.2s, border-color 0.2s, color 0.2s;
   letter-spacing: 0.3px;
   margin-top: 14px;
+}
+
+#arrival-btn.show {
+  display: inline-block;
 }
 
 #arrival-btn:active {
@@ -523,11 +528,11 @@ body {
   <h2>Configuration</h2>
   <div class="field">
     <label>Target Latitude</label>
-    <input type="number" id="inp-lat" step="0.000001" placeholder="12.9763">
+    <input type="number" id="inp-lat" step="0.000000000000001" placeholder="12.972789483387869">
   </div>
   <div class="field">
     <label>Target Longitude</label>
-    <input type="number" id="inp-lng" step="0.000001" placeholder="77.5929">
+    <input type="number" id="inp-lng" step="0.000000000000001" placeholder="77.59164304817426">
   </div>
   <div class="field">
     <label>Smoothing Factor (α)</label>
@@ -571,8 +576,8 @@ body {
     calibrationTimer: null,
 
     // Target (Cubbon Designs event location)
-    targetLat: 12.9763,
-    targetLng: 77.5929,
+    targetLat: 12.972789483387869,
+    targetLng: 77.59164304817426,
 
     // Settings
     smoothingFactor: 0.1,
@@ -1159,9 +1164,17 @@ body {
      ARRIVAL DETECTION & FLOW
      ══════════════════════════════════════ */
   function checkArrivalProximity() {
-    if (hasArrived || arrivalPromptShown) return;
     if (S.distance === null) return;
     var dMeters = S.distance * 1000;
+
+    // Show/hide manual arrival button based on 100m range
+    if (dMeters <= 100 && !hasArrived) {
+      arrivalBtn.classList.add('show');
+    } else {
+      arrivalBtn.classList.remove('show');
+    }
+
+    if (hasArrived || arrivalPromptShown) return;
     if (dMeters >= 30 && dMeters <= 40) {
       arrivalPromptShown = true;
       showArrivalQuestion();
