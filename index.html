@@ -584,6 +584,7 @@ body {
     // Calibration warm-up
     calibrating: false,
     calibrationTimer: null,
+    calibrationReadings: [],
 
     // Target (Cubbon Designs event location)
     targetLat: 12.9726723,
@@ -827,11 +828,11 @@ body {
     // Normalize 0-360
     rawDeg = (rawDeg + 360) % 360;
 
-    // ── Fix 1: Outlier rejection (wraparound-safe) ──
+    // ── Outlier rejection (wraparound-safe) ──
     if (S.previousHeading !== null) {
       var delta = wrapDelta(rawDeg, S.previousHeading);
-      if (Math.abs(delta) > S.outlierThreshold) {
-        // Reject this reading
+      if (Math.abs(delta) > 30) {
+        // Reject this reading — do not update previousHeading or smoothedHeading
         return;
       }
     }
@@ -940,6 +941,12 @@ body {
     S.hasCompass = true;
     S.rawHeading = heading;
 
+    // During calibration: collect readings for baseline averaging, skip filter
+    if (S.calibrating) {
+      S.calibrationReadings.push(heading);
+      return;
+    }
+
     // Process through outlier rejection + low-pass filter
     processHeading(heading);
   }
@@ -979,6 +986,7 @@ body {
   function beginCalibration() {
     S.calibrating = true;
     S.previousHeading = null;
+    S.calibrationReadings = [];
     calNotice.classList.add('show');
     statusEl.textContent = 'Calibrating…';
 
@@ -993,13 +1001,28 @@ body {
     S.calibrationTimer = setTimeout(function () {
       S.calibrating = false;
       calNotice.classList.remove('show');
-      // Snap smoothedHeading to current raw heading for clean start
-      if (S.rawHeading !== null) {
-        S.smoothedHeading = S.rawHeading;
-        S.previousHeading = S.rawHeading;
+
+      // Compute circular mean of collected readings for a stable baseline
+      var baselineHeading = null;
+      if (S.calibrationReadings.length > 0) {
+        var sinSum = 0, cosSum = 0;
+        for (var i = 0; i < S.calibrationReadings.length; i++) {
+          var r = S.calibrationReadings[i] * Math.PI / 180;
+          sinSum += Math.sin(r);
+          cosSum += Math.cos(r);
+        }
+        baselineHeading = (Math.atan2(sinSum, cosSum) * 180 / Math.PI + 360) % 360;
+      } else if (S.rawHeading !== null) {
+        baselineHeading = S.rawHeading;
       }
+
+      if (baselineHeading !== null) {
+        S.smoothedHeading = baselineHeading;
+        S.previousHeading = baselineHeading;
+      }
+
       statusEl.textContent = 'Navigation active';
-    }, 3000);
+    }, 5000);
   }
 
   /* ══════════════════════════════════════
