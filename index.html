@@ -66,7 +66,7 @@ body {
 }
 
 #welcome-start-btn {
-  background: #4ade80;
+  background: #4caf7d;
   color: #111;
   border: none;
   padding: 16px 40px;
@@ -78,7 +78,7 @@ body {
 }
 
 #welcome-start-btn:active {
-  background: #22c55e;
+  background: #3d9e6a;
 }
 
 /* ── Top Navigation Bar ── */
@@ -157,7 +157,7 @@ body {
   display: none;
   margin-top: 10px;
   font-size: 12px;
-  color: #4ade80;
+  color: #4caf7d;
   letter-spacing: 0.5px;
   text-align: center;
   animation: pulse-text 1.2s ease-in-out infinite;
@@ -196,9 +196,9 @@ body {
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #4ade80;
-  box-shadow: 0 0 12px 3px rgba(74, 222, 128, 0.4),
-              0 0 24px 6px rgba(74, 222, 128, 0.15);
+  background: #4caf7d;
+  box-shadow: 0 0 12px 3px rgba(76, 175, 125, 0.4),
+              0 0 24px 6px rgba(76, 175, 125, 0.15);
   pointer-events: none;
   z-index: 10;
   transform: translate(-50%, -50%);
@@ -217,7 +217,7 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 50%;
-  border: 1px solid rgba(74, 222, 128, 0.35);
+  border: 1px solid rgba(76, 175, 125, 0.35);
   transform: translate(-50%, -50%);
   animation: dot-pulse 1.8s ease-out infinite;
 }
@@ -260,8 +260,8 @@ body {
 }
 
 .btn.running {
-  border-color: #4ade80;
-  color: #4ade80;
+  border-color: #4caf7d;
+  color: #4caf7d;
 }
 
 /* ── Status ── */
@@ -333,7 +333,7 @@ body {
 
 .field input[type="range"] {
   width: 100%;
-  accent-color: #4ade80;
+  accent-color: #4caf7d;
   margin-top: 2px;
 }
 
@@ -398,12 +398,12 @@ body {
 }
 
 #bottom-sheet .sheet-btn.primary {
-  background: #4ade80;
+  background: #4caf7d;
   color: #111;
 }
 
 #bottom-sheet .sheet-btn.primary:active {
-  background: #22c55e;
+  background: #3d9e6a;
 }
 
 #bottom-sheet .sheet-btn.secondary {
@@ -484,7 +484,7 @@ body {
 <!-- Welcome Screen -->
 <div id="welcome-screen">
   <h1>Welcome to Cubbon Designs</h1>
-  <p>Here's your navigator to guide you through the event. Find the orange carpet to attend Cubbon Designs.</p>
+  <p>Here's your navigator to guide you through the event. Find the orange mat to attend Cubbon Designs.</p>
   <button id="welcome-start-btn">Let's get started</button>
 </div>
 
@@ -514,7 +514,7 @@ body {
   <div id="recal-hint">Recalibrate every 60 seconds for more accuracy</div>
 </div>
 
-<button id="arrival-btn">I see the orange carpet</button>
+<button id="arrival-btn">I see the orange mat</button>
 
 <div id="status">Waiting to start</div>
 
@@ -528,7 +528,7 @@ body {
 
 <!-- Success Screen -->
 <div id="success-screen">
-  <h1>You've arrived at Cubbon Designs</h1>
+  <h1>You've arrived at Cubbon Designs!</h1>
   <div class="success-sub">Enjoy the event!</div>
 </div>
 <canvas id="confetti-canvas"></canvas>
@@ -551,8 +551,8 @@ body {
   </div>
   <div class="field">
     <label>Outlier Threshold (±degrees)</label>
-    <input type="range" id="inp-outlier" min="10" max="120" step="1" value="45">
-    <div class="rv" id="rv-outlier">±45°</div>
+    <input type="range" id="inp-outlier" min="10" max="120" step="1" value="30">
+    <div class="rv" id="rv-outlier">±30°</div>
   </div>
   <div id="admin-btns">
     <button class="btn" id="btn-save">Save</button>
@@ -591,7 +591,7 @@ body {
 
     // Settings
     smoothingFactor: 0.1,
-    outlierThreshold: 45,
+    outlierThreshold: 30,
     lerpSpeed: 0.08,
 
     // Computed
@@ -606,7 +606,10 @@ body {
     targetDotY: 0,
 
     // Radar sweep
-    sweep: 0
+    sweep: 0,
+
+    // Baseline calibration samples
+    calibrationSamples: []
   };
 
   /* ══════════════════════════════════════
@@ -763,8 +766,8 @@ body {
       ctx.rotate(S.sweep);
 
       var sg = ctx.createLinearGradient(0, 0, RAD, 0);
-      sg.addColorStop(0, 'rgba(74,222,128,0.18)');
-      sg.addColorStop(1, 'rgba(74,222,128,0)');
+      sg.addColorStop(0, 'rgba(76,175,125,0.18)');
+      sg.addColorStop(1, 'rgba(76,175,125,0)');
       ctx.strokeStyle = sg;
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -778,8 +781,8 @@ body {
         var a = 0.13 - t * 0.015;
         if (a <= 0) break;
         var tg = ctx.createLinearGradient(0, 0, RAD, 0);
-        tg.addColorStop(0, 'rgba(74,222,128,' + a + ')');
-        tg.addColorStop(1, 'rgba(74,222,128,0)');
+        tg.addColorStop(0, 'rgba(76,175,125,' + a + ')');
+        tg.addColorStop(1, 'rgba(76,175,125,0)');
         ctx.strokeStyle = tg;
         ctx.beginPath();
         ctx.moveTo(0, 0);
@@ -940,6 +943,12 @@ body {
     S.hasCompass = true;
     S.rawHeading = heading;
 
+    // During calibration, only collect raw samples for baseline averaging
+    if (S.calibrating) {
+      S.calibrationSamples.push((heading + 360) % 360);
+      return;
+    }
+
     // Process through outlier rejection + low-pass filter
     processHeading(heading);
   }
@@ -974,11 +983,25 @@ body {
   }
 
   /* ══════════════════════════════════════
-     CALIBRATION WARM-UP — Fix 4
+     CALIBRATION WARM-UP
      ══════════════════════════════════════ */
+
+  // Circular mean handles the 359°→1° wraparound correctly
+  function circularMean(headings) {
+    if (headings.length === 0) return null;
+    var sumSin = 0, sumCos = 0;
+    for (var i = 0; i < headings.length; i++) {
+      var rad = headings[i] * Math.PI / 180;
+      sumSin += Math.sin(rad);
+      sumCos += Math.cos(rad);
+    }
+    return (Math.atan2(sumSin, sumCos) * 180 / Math.PI + 360) % 360;
+  }
+
   function beginCalibration() {
     S.calibrating = true;
     S.previousHeading = null;
+    S.calibrationSamples = [];
     calNotice.classList.add('show');
     statusEl.textContent = 'Calibrating…';
 
@@ -990,16 +1013,21 @@ body {
 
     if (S.calibrationTimer) clearTimeout(S.calibrationTimer);
 
+    // Collect readings for 5 seconds, then snap to their circular mean
     S.calibrationTimer = setTimeout(function () {
       S.calibrating = false;
       calNotice.classList.remove('show');
-      // Snap smoothedHeading to current raw heading for clean start
-      if (S.rawHeading !== null) {
-        S.smoothedHeading = S.rawHeading;
-        S.previousHeading = S.rawHeading;
+
+      var baseline = circularMean(S.calibrationSamples);
+      if (baseline === null) baseline = S.rawHeading; // fallback if no samples
+      S.calibrationSamples = [];
+
+      if (baseline !== null) {
+        S.smoothedHeading = baseline;
+        S.previousHeading = baseline;
       }
       statusEl.textContent = 'Navigation active';
-    }, 3000);
+    }, 5000);
   }
 
   /* ══════════════════════════════════════
@@ -1163,14 +1191,14 @@ body {
     }
 
     if (hasArrived || arrivalPromptShown) return;
-    if (dMeters >= 30 && dMeters <= 40) {
+    if (dMeters <= 35) {
       arrivalPromptShown = true;
       showArrivalQuestion();
     }
   }
 
   function showArrivalQuestion() {
-    sheetText.textContent = 'Did you spot the orange carpet?';
+    sheetText.textContent = 'Did you spot the orange mat?';
     sheetBtns.innerHTML = '';
 
     var yesBtn = document.createElement('button');
@@ -1187,14 +1215,23 @@ body {
     noBtn.addEventListener('click', function () {
       sheetText.textContent = 'Please contact the event organizers via the Cubbon Designs WhatsApp group.';
       sheetBtns.innerHTML = '';
-      var okBtn = document.createElement('button');
-      okBtn.className = 'sheet-btn secondary';
-      okBtn.textContent = 'OK';
-      okBtn.addEventListener('click', function () {
+      var waBtn = document.createElement('button');
+      waBtn.className = 'sheet-btn primary';
+      waBtn.textContent = 'Open WhatsApp';
+      waBtn.addEventListener('click', function () {
+        window.open('https://wa.me/', '_blank');
         bottomOverlay.classList.remove('open');
         arrivalPromptShown = false;
       });
-      sheetBtns.appendChild(okBtn);
+      var dismissBtn = document.createElement('button');
+      dismissBtn.className = 'sheet-btn secondary';
+      dismissBtn.textContent = 'Dismiss';
+      dismissBtn.addEventListener('click', function () {
+        bottomOverlay.classList.remove('open');
+        arrivalPromptShown = false;
+      });
+      sheetBtns.appendChild(waBtn);
+      sheetBtns.appendChild(dismissBtn);
     });
 
     sheetBtns.appendChild(yesBtn);
